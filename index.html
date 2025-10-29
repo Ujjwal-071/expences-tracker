@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Expense Tracker — Single File (HTML/CSS/JS)</title>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#6ee7b7; --accent-2:#60a5fa;
+      --glass: rgba(255,255,255,0.03);
+      --success:#16a34a;
+      --danger:#ef4444;
+      --max-width:1100px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:#e6eef6;background:linear-gradient(180deg,#071023 0%, #071726 60%);-webkit-font-smoothing:antialiased}
+    .wrap{max-width:var(--max-width);margin:28px auto;padding:20px}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#04263b;font-weight:700;font-size:18px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    h1{font-size:18px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .auth {display:flex;gap:10px;align-items:center}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:var(--accent);cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;color:#cfeef1;border:1px solid rgba(255,255,255,0.04)}
+    .btn.danger{background:linear-gradient(90deg,#ff7a7a,#ff4d4d);color:white}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(3,7,18,0.6);border:1px solid rgba(255,255,255,0.02)}
+
+    /* layout */
+    .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:18px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    input[type="text"],input[type="date"],input[type="number"],select,textarea{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:#e6eef6;outline:none;width:100%}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    form.row{display:flex;gap:8px;align-items:end}
+    form.row > *{flex:1}
+
+    table{width:100%;border-collapse:collapse;color:#dbeafe;margin-top:8px}
+    th,td{padding:10px 8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03);font-size:13px}
+    th{color:var(--muted);font-weight:600;font-size:12px}
+    .muted{color:var(--muted);font-size:13px}
+    .small{font-size:12px;color:var(--muted)}
+
+    .summary{display:flex;flex-direction:column;gap:12px}
+    .summary .box{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.02)}
+    .total{font-size:20px;font-weight:700;color:var(--accent)}
+    .mini{display:flex;gap:8px;align-items:center;justify-content:space-between}
+
+    /* modal */
+    .overlay{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:none;align-items:center;justify-content:center;padding:12px;z-index:80}
+    .overlay.show{display:flex}
+    .modal{width:100%;max-width:520px;background:linear-gradient(180deg,#071226 0%,#071226 60%);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    .modal h3{margin:0 0 8px 0}
+    .row-2{display:flex;gap:8px}
+    .small-note{font-size:12px;color:var(--muted);margin-top:6px}
+
+    /* responsive */
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr}
+      header{flex-direction:column;align-items:flex-start;gap:12px}
+      .auth{width:100%;justify-content:space-between}
+    }
+
+    /* tiny helpers */
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px}
+    .right{text-align:right}
+    .muted-2{color:#9fb6c6;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">ET</div>
+        <div>
+          <h1>Expense Tracker</h1>
+          <p class="lead">Track daily expenses, categorize, filter and visualize — all in your browser.</p>
+        </div>
+      </div>
+
+      <div class="auth">
+        <div id="user-greeting" class="small muted-2">Not signed in</div>
+        <button id="btn-login" class="btn">Login / Register</button>
+        <button id="btn-logout" class="btn ghost" style="display:none">Logout</button>
+      </div>
+    </header>
+
+    <!-- main grid -->
+    <main class="grid">
+      <!-- left: inputs & table -->
+      <section>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small">Add Expense</div>
+              <div class="muted small-note">Save amounts with date and category. Data persists in this browser (localStorage).</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button id="btn-export" class="btn">Export CSV</button>
+              <button id="btn-clear" class="btn ghost">Clear All</button>
+            </div>
+          </div>
+
+          <form id="expense-form" style="margin-top:12px">
+            <div style="display:grid;grid-template-columns:1fr 100px;gap:8px">
+              <div>
+                <label for="category">Category</label>
+                <div style="display:flex;gap:8px">
+                  <select id="category" aria-label="category selector"></select>
+                  <input id="new-cat" type="text" placeholder="Add category" style="width:160px" />
+                  <button id="btn-add-cat" type="button" class="btn">Add</button>
+                </div>
+              </div>
+              <div>
+                <label for="amount">Amount (₹)</label>
+                <input id="amount" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 160px;gap:8px;margin-top:8px">
+              <div>
+                <label for="note">Note</label>
+                <input id="note" type="text" placeholder="Coffee, groceries..." />
+              </div>
+              <div>
+                <label for="date">Date</label>
+                <input id="date" type="date" required />
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+              <button class="btn" id="btn-save" type="submit">Save Expense</button>
+              <button id="btn-reset-form" class="btn ghost" type="button">Reset</button>
+            </div>
+          </form>
+
+          <div style="margin-top:18px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="small">Filter</div>
+              <div class="small muted">Showing recent 200 entries</div>
+            </div>
+
+            <div class="controls" style="margin-top:8px">
+              <div style="min-width:150px">
+                <label>Start</label>
+                <input id="filter-start" type="date" />
+              </div>
+              <div style="min-width:150px">
+                <label>End</label>
+                <input id="filter-end" type="date" />
+              </div>
+              <div style="min-width:160px">
+                <label>Category</label>
+                <select id="filter-category"><option value="">All</option></select>
+              </div>
+              <div style="min-width:160px">
+                <label>Search note</label>
+                <input id="filter-text" type="text" placeholder="search notes..." />
+              </div>
+              <div style="align-self:end">
+                <button id="btn-apply" class="btn">Apply</button>
+                <button id="btn-clear-filter" class="btn ghost">Clear</button>
+              </div>
+            </div>
+
+            <div style="overflow:auto;max-height:420px;margin-top:8px">
+              <table id="table-expenses">
+                <thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="right">Amount</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- right: charts & summary -->
+      <aside>
+        <div class="summary">
+          <div class="card box">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div class="small">Total (filtered)</div>
+                <div class="total" id="total-amount">₹0.00</div>
+                <div class="small-note">Tip: use date filters to view monthly totals.</div>
+              </div>
+              <div style="width:160px">
+                <label>Quick range</label>
+                <select id="quick-range" style="width:100%">
+                  <option value="">Custom</option>
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card box" style="padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><div class="small">Expenses by category</div><div class="small muted">Aggregated</div></div>
+              <div class="pill" id="count-cats">0 categories</div>
+            </div>
+            <canvas id="chart-pie" style="width:100%;height:240px;margin-top:8px"></canvas>
+          </div>
+
+          <div class="card box" style="padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><div class="small">Daily / Monthly trend</div><div class="small muted">Last 30 days</div></div>
+              <div class="pill">Trend</div>
+            </div>
+            <canvas id="chart-line" style="width:100%;height:200px;margin-top:8px"></canvas>
+          </div>
+
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- modal for login/register -->
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="modal card" role="dialog" aria-modal="true">
+      <h3 id="modal-title">Login or Register</h3>
+      <p class="small-note">This is a client-only demo. Accounts are stored in your browser's localStorage.</p>
+
+      <div style="margin-top:12px">
+        <label for="m-username">Username</label>
+        <input id="m-username" type="text" autocomplete="username" />
+      </div>
+      <div style="margin-top:8px">
+        <label for="m-password">Password</label>
+        <input id="m-password" type="password" autocomplete="current-password" />
+      </div>
+
+      <div class="row-2" style="margin-top:12px">
+        <button id="btn-modal-login" class="btn">Login</button>
+        <button id="btn-modal-register" class="btn ghost">Register</button>
+        <button id="btn-close-modal" class="btn" style="margin-left:auto">Close</button>
+      </div>
+
+      <div id="modal-msg" class="small-note" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================
+       LocalStorage data model:
+       - users: { username: { password: "..."} , ... }
+       - categories_{username}: ["Food","Transport",...]
+       - expenses_{username}: [{id,category,amount,date,note,createdAt}]
+       ========================= */
+
+    // ---- helpers ----
+    const $ = id => document.getElementById(id);
+    const qs = sel => document.querySelector(sel);
+    const formatCurrency = v => '₹' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const uid = () => 'e_' + Math.random().toString(36).slice(2,10);
+
+    // ---- state ----
+    let currentUser = null;
+    const MAX_SHOW = 200;
+
+    // ---- DOM refs ----
+    const overlay = $('overlay');
+    const btnLogin = $('btn-login');
+    const btnLogout = $('btn-logout');
+    const userGreeting = $('user-greeting');
+
+    const mUser = $('m-username'), mPass = $('m-password'), modalMsg = $('modal-msg');
+    const btnModalLogin = $('btn-modal-login'), btnModalRegister = $('btn-modal-register'), btnCloseModal = $('btn-close-modal');
+
+    const categorySelect = $('category');
+    const newCatInput = $('new-cat'), btnAddCat = $('btn-add-cat');
+    const amountInput = $('amount'), noteInput = $('note'), dateInput = $('date');
+    const expenseForm = $('expense-form'), btnResetForm = $('btn-reset-form');
+
+    const filterStart = $('filter-start'), filterEnd = $('filter-end'), filterCategory = $('filter-category'), filterText = $('filter-text');
+    const btnApply = $('btn-apply'), btnClearFilter = $('btn-clear-filter'), btnExport = $('btn-export'), btnClear = $('btn-clear');
+
+    const tableBody = document.querySelector('#table-expenses tbody'), totalAmountEl = $('total-amount');
+    const countCats = $('count-cats'), quickRange = $('quick-range');
+
+    // charts
+    let pieChart = null, lineChart = null;
+    const pieCtx = document.getElementById('chart-pie').getContext('2d');
+    const lineCtx = document.getElementById('chart-line').getContext('2d');
+
+    // ---- storage helpers ----
+    function getUsers(){ return JSON.parse(localStorage.getItem('et_users')||'{}') }
+    function setUsers(u){ localStorage.setItem('et_users', JSON.stringify(u)) }
+
+    function getCategories(user){
+      return JSON.parse(localStorage.getItem('et_categories_' + user) || '[]');
+    }
+    function setCategories(user, arr){
+      localStorage.setItem('et_categories_' + user, JSON.stringify(arr));
+    }
+
+    function getExpenses(user){
+      return JSON.parse(localStorage.getItem('et_expenses_' + user) || '[]');
+    }
+    function setExpenses(user, arr){
+      localStorage.setItem('et_expenses_' + user, JSON.stringify(arr));
+    }
+
+    // ---- auth ----
+    function openModal(){ overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false'); }
+    function closeModal(){ overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); modalMsg.textContent=''; mPass.value=''; }
+
+    btnLogin.addEventListener('click', openModal);
+    btnCloseModal.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeModal(); });
+
+    btnModalRegister.addEventListener('click', ()=>{
+      const username = mUser.value.trim(), password = mPass.value;
+      if(!username || !password){ modalMsg.textContent = 'Enter username & password'; return; }
+      const users = getUsers();
+      if(users[username]){ modalMsg.textContent = 'User exists. Please login.'; return; }
+      users[username] = { password };
+      setUsers(users);
+      // seed default categories
+      setCategories(username, ['Food','Transport','Shopping','Bills','Uncategorized']);
+      modalMsg.style.color = 'var(--accent)'; modalMsg.textContent = 'Registered — you can now login.';
+    });
+
+    btnModalLogin.addEventListener('click', ()=>{
+      const username = mUser.value.trim(), password = mPass.value;
+      if(!username || !password){ modalMsg.textContent = 'Enter username & password'; return; }
+      const users = getUsers();
+      if(!users[username] || users[username].password !== password){ modalMsg.style.color='var(--danger)'; modalMsg.textContent = 'Invalid credentials.'; return; }
+      // success
+      currentUser = username;
+      closeModal();
+      afterLogin();
+    });
+
+    btnLogout.addEventListener('click', ()=>{
+      currentUser = null;
+      afterLogout();
+    });
+
+    function afterLogin(){
+      userGreeting.textContent = 'Signed in: ' + currentUser;
+      btnLogin.style.display = 'none';
+      btnLogout.style.display = 'inline-block';
+      // load UI
+      populateCategories();
+      populateFilterCategories();
+      renderAll();
+    }
+
+    function afterLogout(){
+      userGreeting.textContent = 'Not signed in';
+      btnLogin.style.display = 'inline-block';
+      btnLogout.style.display = 'none';
+      // clear UI and charts
+      categorySelect.innerHTML = '';
+      filterCategory.innerHTML = '<option value="">All</option>';
+      tableBody.innerHTML = '';
+      totalAmountEl.textContent = '₹0.00';
+      countCats.textContent = '0 categories';
+      if(pieChart){ pieChart.data.labels=[]; pieChart.data.datasets[0].data=[]; pieChart.update(); }
+      if(lineChart){ lineChart.data.labels=[]; lineChart.data.datasets[0].data=[]; lineChart.update(); }
+    }
+
+    // ---- categories ----
+    function populateCategories(){
+      if(!currentUser) return;
+      const cats = getCategories(currentUser);
+      categorySelect.innerHTML = '';
+      cats.forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
+        categorySelect.appendChild(opt);
+      });
+      // if none selected add placeholder
+      if(!cats.length){ setCategories(currentUser, ['Uncategorized']); populateCategories(); }
+    }
+
+    function populateFilterCategories(){
+      if(!currentUser) return;
+      const cats = getCategories(currentUser);
+      filterCategory.innerHTML = '<option value="">All</option>';
+      cats.forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
+        filterCategory.appendChild(opt);
+      });
+    }
+
+    btnAddCat.addEventListener('click', ()=>{
+      const name = newCatInput.value.trim();
+      if(!name || !currentUser) return;
+      const cats = getCategories(currentUser);
+      if(cats.includes(name)){ newCatInput.value=''; return; }
+      cats.push(name); setCategories(currentUser,cats);
+      newCatInput.value=''; populateCategories(); populateFilterCategories(); renderAll();
+    });
+
+    // ---- expense form ----
+    expenseForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      if(!currentUser){ openModal(); modalMsg.textContent='Please login first.'; return; }
+      const category = categorySelect.value || 'Uncategorized';
+      const amount = parseFloat(amountInput.value);
+      const note = noteInput.value.trim();
+      const date = dateInput.value;
+      if(Number.isNaN(amount) || amount <= 0 || !date){ alert('Please provide valid amount and date.'); return; }
+      const exp = { id: uid(), category, amount: +amount.toFixed(2), note, date, createdAt: new Date().toISOString() };
+      const exps = getExpenses(currentUser);
+      exps.unshift(exp); // newest first
+      setExpenses(currentUser, exps);
+      // ensure category exists
+      const cats = getCategories(currentUser);
+      if(!cats.includes(category)){ cats.push(category); setCategories(currentUser, cats); populateCategories(); populateFilterCategories(); }
+      expenseForm.reset();
+      // set today's date back to input for convenience
+      dateInput.valueAsDate = new Date();
+      renderAll();
+    });
+
+    btnResetForm.addEventListener('click', ()=> expenseForm.reset());
+
+    // ---- table & filters & rendering ----
+    function getFilteredExpenses(){
+      if(!currentUser) return [];
+      let exps = getExpenses(currentUser).slice(0, 10000); // local copy
+      const s = filterStart.value || null;
+      const e = filterEnd.value || null;
+      const cat = filterCategory.value || null;
+      const txt = filterText.value.trim().toLowerCase();
+
+      if(s) exps = exps.filter(x => x.date >= s);
+      if(e) exps = exps.filter(x => x.date <= e);
+      if(cat) exps = exps.filter(x => x.category === cat);
+      if(txt) exps = exps.filter(x => (x.note||'').toLowerCase().includes(txt));
+      return exps.slice(0, MAX_SHOW);
+    }
+
+    function renderTable(){
+      const exps = getFilteredExpenses();
+      tableBody.innerHTML = '';
+      if(!exps.length){
+        tableBody.innerHTML = '<tr><td colspan="5" class="muted">No expenses</td></tr>';
+        return;
+      }
+      exps.forEach(e => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${e.date}</td>
+                        <td>${escapeHTML(e.category)}</td>
+                        <td>${escapeHTML(e.note||'')}</td>
+                        <td class="right">${formatCurrency(e.amount)}</td>
+                        <td style="width:70px"><button class="btn ghost" data-id="${e.id}">Del</button></td>`;
+        tableBody.appendChild(tr);
+      });
+      // attach delete handlers
+      tableBody.querySelectorAll('button[data-id]').forEach(b => {
+        b.addEventListener('click', ()=>{
+          const id = b.getAttribute('data-id');
+          let ex = getExpenses(currentUser).filter(x=>x.id!==id);
+          setExpenses(currentUser, ex);
+          renderAll();
+        });
+      });
+    }
+
+    function escapeHTML(s){ return (s+'').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+    function renderSummary(){
+      const exps = getFilteredExpenses();
+      const total = exps.reduce((a,b)=>a + Number(b.amount||0),0);
+      totalAmountEl.textContent = formatCurrency(total);
+    }
+
+    // ---- charts ----
+    function buildPieData(exps){
+      const map = {};
+      exps.forEach(x => {
+        const k = x.category || 'Uncategorized';
+        map[k] = (map[k] || 0) + Number(x.amount||0);
+      });
+      const labels = Object.keys(map).sort((a,b)=>map[b]-map[a]);
+      const values = labels.map(l=>+map[l].toFixed(2));
+      return {labels, values};
+    }
+
+    function buildLineData(exps, days=30){
+      // daily sums for last `days`
+      const now = new Date();
+      const dates = [];
+      for(let i=days-1;i>=0;i--){
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        dates.push(d.toISOString().slice(0,10));
+      }
+      const map = {};
+      exps.forEach(x=>{
+        if(dates.includes(x.date)) map[x.date] = (map[x.date]||0) + Number(x.amount||0);
+      });
+      const values = dates.map(d => +(map[d]||0).toFixed(2));
+      return {labels:dates, values};
+    }
+
+    function initCharts(){
+      pieChart = new Chart(pieCtx, {
+        type: 'pie',
+        data: { labels: [], datasets: [{ data: [], label:'Expenses' }] },
+        options: {
+          responsive:true,
+          plugins: { legend:{position:'bottom',labels:{color:'#e6eef6'}} }
+        }
+      });
+
+      lineChart = new Chart(lineCtx, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label:'Amount', data: [], tension:0.25 }] },
+        options: {
+          responsive:true,
+          scales:{ x:{ ticks:{color:'#cfeef1'}}, y:{ ticks:{color:'#cfeef1'} } },
+          plugins:{ legend:{display:false} }
+        }
+      });
+    }
+
+    function updateCharts(){
+      if(!currentUser) return;
+      const expsAll = getExpenses(currentUser);
+      const filtered = getFilteredExpenses();
+
+      // pie: based on filtered dataset (so chart responds to filters)
+      const pie = buildPieData(filtered);
+      pieChart.data.labels = pie.labels;
+      pieChart.data.datasets[0].data = pie.values;
+      pieChart.update();
+
+      // line: trend using last 30 days from filtered data (or use all to show recent activity)
+      const line = buildLineData(expsAll, 30);
+      lineChart.data.labels = line.labels;
+      lineChart.data.datasets[0].data = line.values;
+      lineChart.update();
+
+      countCats.textContent = (getCategories(currentUser).length || 0) + ' categories';
+    }
+
+    // ---- export CSV ----
+    btnExport.addEventListener('click', ()=>{
+      if(!currentUser){ openModal(); modalMsg.textContent='Please login first.'; return; }
+      const exps = getFilteredExpenses();
+      if(!exps.length){ alert('No expenses to export'); return; }
+      const rows = [['Date','Category','Amount','Note']];
+      exps.forEach(e => rows.push([e.date, e.category, e.amount, e.note || '']));
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = (currentUser + '_expenses.csv');
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // ---- clear all (dangerous) ----
+    btnClear.addEventListener('click', ()=>{
+      if(!currentUser){ openModal(); modalMsg.textContent='Please login first.'; return; }
+      if(!confirm('Delete all your expenses and categories? This cannot be undone.')) return;
+      localStorage.removeItem('et_expenses_' + currentUser);
+      localStorage.removeItem('et_categories_' + currentUser);
+      populateCategories(); populateFilterCategories(); renderAll();
+    });
+
+    // ---- filters actions ----
+    btnApply.addEventListener('click', ()=> renderAll());
+    btnClearFilter.addEventListener('click', ()=>{
+      filterStart.value=''; filterEnd.value=''; filterCategory.value=''; filterText.value=''; quickRange.value='';
+      renderAll();
+    });
+
+    quickRange.addEventListener('change', ()=>{
+      const val = quickRange.value;
+      if(!val){ filterStart.value=''; filterEnd.value=''; renderAll(); return; }
+      const end = new Date();
+      const start = new Date(); start.setDate(end.getDate() - (Number(val)-1));
+      filterStart.value = start.toISOString().slice(0,10);
+      filterEnd.value = end.toISOString().slice(0,10);
+      renderAll();
+    });
+
+    // ---- initial render ----
+    function renderAll(){
+      if(!currentUser) return;
+      // keep date default to today if empty
+      if(!dateInput.value) dateInput.valueAsDate = new Date();
+
+      populateCategories(); populateFilterCategories();
+      renderTable();
+      renderSummary();
+      updateCharts();
+    }
+
+    // initialize app
+    (function init(){
+      initCharts();
+      // if someone already logged in during this session (we save in sessionStorage)
+      const saved = sessionStorage.getItem('et_currentUser');
+      if(saved && getUsers()[saved]){ currentUser = saved; afterLogin(); } else afterLogout();
+
+      // wire session save when login occurs
+      document.addEventListener('click', (e)=>{
+        // detect afterLogin change: session set when currentUser toggles
+        if(currentUser) sessionStorage.setItem('et_currentUser', currentUser);
+      });
+    })();
+
+    // for safety: ensure today's date present on load
+    dateInput.valueAsDate = new Date();
+
+    // small accessibility: close modal on escape
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
+
+    // expose some helpers for debugging (optional)
+    window._et = {
+      getUsers, getCategories, getExpenses, setExpenses, setCategories
+    };
+  </script>
+</body>
+</html>
